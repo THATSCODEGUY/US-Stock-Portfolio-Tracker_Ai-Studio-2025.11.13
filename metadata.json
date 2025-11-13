@@ -1,0 +1,5 @@
+{
+  "name": "US Stock Portfolio Tracker",
+  "description": "A web application to track US stock market positions, view market value, and monitor gains and losses with a clean, modern interface.",
+  "requestFramePermissions": []
+}
