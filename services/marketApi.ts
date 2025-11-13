@@ -63,3 +63,38 @@ export const fetchQuote = (ticker: string): Promise<Quote> => {
     }, 300 + Math.random() * 400); // Simulate network latency
   });
 };
+
+export const fetchHistoricalData = (ticker: string, days: number): {date: string, price: number}[] => {
+    const upperTicker = ticker.toUpperCase();
+     if (!tickerCache[upperTicker]) {
+          tickerCache[upperTicker] = {
+              basePrice: 50 + Math.random() * 450,
+              companyName: `${upperTicker} Company Inc.`
+          };
+      }
+
+    const history: {date: string, price: number}[] = [];
+    let currentPrice = tickerCache[upperTicker].basePrice;
+    const today = new Date();
+
+    for (let i = 0; i < days; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - (days - 1 - i));
+        
+        const changePercent = (Math.random() - 0.5) * 0.05; // Simulate daily volatility
+        currentPrice *= (1 + changePercent);
+        
+        history.push({
+            date: date.toISOString().split('T')[0],
+            price: currentPrice
+        });
+    }
+
+    // Ensure the last price point matches the current "real" price for consistency
+    const lastPointIndex = history.length-1;
+    if (history[lastPointIndex]) {
+        history[lastPointIndex].price = tickerCache[upperTicker].basePrice * (1 + (Math.random() - 0.495) * 0.05);
+    }
+    
+    return history.reverse(); // Return in chronological order
+};

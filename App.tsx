@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { type Position, type Transaction } from './types';
+import { type Position, type Transaction, type HistoricalDataPoint } from './types';
 import { Header } from './components/Header';
 import { AddPositionForm } from './components/AddPositionForm';
 import { PortfolioTable } from './components/PortfolioTable';
 import { PortfolioSummary } from './components/PortfolioSummary';
 import { sampleTransactions } from './constants';
-import { fetchQuote } from './services/marketApi';
+import { fetchQuote, fetchHistoricalData } from './services/marketApi';
 import { EditTransactionModal } from './components/EditTransactionModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { TransactionHistoryTable } from './components/TransactionHistoryTable';
 import { PortfolioPieChart } from './components/PortfolioPieChart';
 import { ChatBot } from './components/ChatBot';
+import { PortfolioPerformanceChart } from './components/PortfolioPerformanceChart';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -98,6 +99,53 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [transactions]);
 
+  const historicalData = useMemo(() => {
+    const data: HistoricalDataPoint[] = [];
+    if (transactions.length === 0) return data;
+  
+    const tickers = [...new Set(transactions.map(t => t.ticker))];
+    const historicalPrices: { [key: string]: { [key: string]: number } } = {};
+  
+    // This is a simplified mock. In a real app, you'd fetch this properly.
+    tickers.forEach(ticker => {
+        const prices = fetchHistoricalData(ticker, 30);
+        historicalPrices[ticker] = Object.fromEntries(prices.map(p => [p.date, p.price]));
+    });
+
+    const today = new Date();
+    for (let i = 29; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateString = date.toISOString().split('T')[0];
+
+        let dailyValue = 0;
+        const dailyPositions: { [key: string]: number } = {};
+
+        // Determine holdings on this specific day
+        transactions.forEach(tx => {
+            if (new Date(tx.date) <= date) {
+                if (!dailyPositions[tx.ticker]) {
+                    dailyPositions[tx.ticker] = 0;
+                }
+                if (tx.type === 'BUY') {
+                    dailyPositions[tx.ticker] += tx.shares;
+                } else {
+                    dailyPositions[tx.ticker] -= tx.shares;
+                }
+            }
+        });
+
+        // Calculate market value for that day
+        Object.entries(dailyPositions).forEach(([ticker, shares]) => {
+            if (shares > 0 && historicalPrices[ticker]?.[dateString]) {
+                dailyValue += shares * historicalPrices[ticker][dateString];
+            }
+        });
+        
+        data.push({ date: dateString, value: dailyValue });
+    }
+    return data;
+  }, [transactions]);
 
   const addTransaction = useCallback(async (newTransaction: Omit<Transaction, 'id'>) => {
     setTransactions(prev => [...prev, { ...newTransaction, id: Date.now().toString() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
@@ -135,6 +183,10 @@ const App: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
+             <div>
+                <h2 className="text-2xl font-bold mb-4 text-white">Portfolio Performance (30 Days)</h2>
+                <PortfolioPerformanceChart data={historicalData} />
+            </div>
              <div>
               <h2 className="text-2xl font-bold mb-4 text-white">Portfolio Distribution</h2>
               <PortfolioPieChart positions={positions} />
