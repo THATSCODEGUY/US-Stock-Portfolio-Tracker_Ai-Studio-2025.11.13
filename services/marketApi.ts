@@ -1,125 +1,145 @@
-// This is a mock API service to simulate fetching real-time stock data.
-// In a real-world application, you would replace this with a call to a financial data API
-// like Alpha Vantage, IEX Cloud, or Financial Modeling Prep.
+import { type Quote } from '../types';
 
-export interface Quote {
-  ticker: string;
-  companyName: string;
-  price: number;
-  volume: number;
-  dayHigh: number;
-  dayLow: number;
-  previousClose: number;
-}
+// State to track if we should use mock data for the session
+let useMockData = false;
 
-const TICKER_CACHE_KEY = 'stockTickerCache';
-
-// A simple in-memory cache to make price fluctuations feel more "real"
-const defaultTickerCache: { [key: string]: { basePrice: number, companyName: string } } = {
-    'AAPL': { basePrice: 172.50, companyName: 'Apple Inc.' },
-    'GOOGL': { basePrice: 135.80, companyName: 'Alphabet Inc.' },
-    'TSLA': { basePrice: 225.40, companyName: 'Tesla, Inc.' },
-    'NVDA': { basePrice: 488.30, companyName: 'NVIDIA Corporation' },
-    'AMZN': { basePrice: 130.00, companyName: 'Amazon.com, Inc.' },
-    'MSFT': { basePrice: 330.00, companyName: 'Microsoft Corporation' }
+// In-memory cache for mock prices to ensure consistency
+const mockPriceCache: { [key: string]: { price: number, companyName: string } } = {
+  'AAPL': { price: 175.82, companyName: 'Apple Inc.' },
+  'GOOGL': { price: 133.21, companyName: 'Alphabet Inc.' },
+  'TSLA': { price: 225.88, companyName: 'Tesla, Inc.' },
+  'NVDA': { price: 484.44, companyName: 'NVIDIA Corporation' },
 };
 
-const loadTickerCache = (): { [key: string]: { basePrice: number, companyName: string } } => {
-    try {
-        const savedCache = localStorage.getItem(TICKER_CACHE_KEY);
-        if (savedCache) {
-            return JSON.parse(savedCache);
-        }
-    } catch (error) {
-        console.error("Could not parse ticker cache from localStorage", error);
-    }
-    return defaultTickerCache;
-};
-
-const tickerCache = loadTickerCache();
-
-const saveTickerCache = () => {
-    try {
-        localStorage.setItem(TICKER_CACHE_KEY, JSON.stringify(tickerCache));
-    } catch (error) {
-        console.error("Could not save ticker cache to localStorage", error);
-    }
-}
-
-export const fetchQuote = (ticker: string): Promise<Quote> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const upperTicker = ticker.toUpperCase();
-
-      if (upperTicker === 'FAIL') {
-        return reject(new Error(`Invalid ticker symbol: ${ticker}`));
-      }
-      
-      // If the ticker is new, dynamically add it to the cache and save it.
-      if (!tickerCache[upperTicker]) {
-          console.log(`New ticker "${upperTicker}" detected. Generating mock data.`);
-          tickerCache[upperTicker] = {
-              basePrice: 50 + Math.random() * 450, // Assign a random base price between $50 and $500
-              companyName: `${upperTicker} Company` // Generate a placeholder name
-          };
-          saveTickerCache();
-      }
-
-      const cacheEntry = tickerCache[upperTicker];
-      const basePrice = cacheEntry.basePrice;
-
-      // Simulate price fluctuation
-      const changePercent = (Math.random() - 0.495) * 0.05; // -2.5% to +2.5% change
-      const newPrice = basePrice * (1 + changePercent);
-      const previousClose = basePrice / (1 + (Math.random() - 0.5) * 0.1);
-      const dayHigh = Math.max(newPrice, previousClose) * (1 + Math.random() * 0.02);
-      const dayLow = Math.min(newPrice, previousClose) * (1 - Math.random() * 0.02);
-      
-      resolve({
-        ticker: upperTicker,
-        companyName: cacheEntry.companyName,
-        price: newPrice,
-        volume: 1_000_000 + Math.random() * 10_000_000,
-        dayHigh,
-        dayLow,
-        previousClose
-      });
-    }, 300 + Math.random() * 400); // Simulate network latency
-  });
-};
-
-export const fetchHistoricalData = (ticker: string, days: number): {date: string, price: number}[] => {
+const getMockQuote = (ticker: string): Quote => {
     const upperTicker = ticker.toUpperCase();
-     if (!tickerCache[upperTicker]) {
-          tickerCache[upperTicker] = {
-              basePrice: 50 + Math.random() * 450,
-              companyName: `${upperTicker} Company`
-          };
-          saveTickerCache();
-      }
-
-    const history: {date: string, price: number}[] = [];
-    let currentPrice = tickerCache[upperTicker].basePrice;
-    const today = new Date();
-
-    for (let i = 0; i < days; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - (days - 1 - i));
-        
-        const changePercent = (Math.random() - 0.5) * 0.05; // Simulate daily volatility
-        currentPrice *= (1 + changePercent);
-        
-        history.push({
-            date: date.toISOString().split('T')[0],
-            price: currentPrice
-        });
-    }
-
-    // Ensure the last price point matches the current "real" price for consistency
-    const lastPointIndex = history.length-1;
-    if (history[lastPointIndex]) {
-        history[lastPointIndex].price = tickerCache[upperTicker].basePrice * (1 + (Math.random() - 0.495) * 0.05);
+    if (!mockPriceCache[upperTicker]) {
+        // Generate a plausible random price for new tickers
+        mockPriceCache[upperTicker] = { price: Math.random() * 500 + 50, companyName: `${upperTicker} Company` };
+    } else {
+       // Fluctuate the price slightly for a "live" feel
+       mockPriceCache[upperTicker].price *= (1 + (Math.random() - 0.5) * 0.02);
     }
     
-    return history.reverse(); // Return in chronological order
+    const { price, companyName } = mockPriceCache[upperTicker];
+
+    return {
+        ticker: upperTicker,
+        companyName: companyName,
+        price: price,
+        volume: Math.random() * 10000000,
+        dayHigh: price * 1.02,
+        dayLow: price * 0.98,
+        previousClose: price * 0.99,
+    };
+};
+
+const getMockHistoricalData = (ticker: string, days: number): {date: string, price: number}[] => {
+    const data = [];
+    const upperTicker = ticker.toUpperCase();
+    let price = mockPriceCache[upperTicker]?.price || Math.random() * 500 + 50;
+    if(!mockPriceCache[upperTicker]) {
+      mockPriceCache[upperTicker] = { price, companyName: `${upperTicker} Company`};
+    }
+
+    const endDate = new Date();
+    // Generate backwards from a consistent end-point
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date(endDate);
+        date.setDate(date.getDate() - i);
+        if (i < days - 1) { // Don't fluctuate the most recent price
+           price *= (1 + (Math.random() - 0.5) * 0.05);
+        }
+        data.push({ date: date.toISOString().split('T')[0], price });
+    }
+    return data;
+};
+
+
+// The key user provided which causes 403 errors
+const API_KEY = 'sneLo8y5QzmJCQqdaqZCZ1n4tyNI2Rgn';
+const BASE_URL = 'https://financialmodelingprep.com/api/v3';
+
+// The API now returns an object indicating if the data is mocked
+export const fetchQuote = async (ticker: string): Promise<Quote & { isMock: boolean }> => {
+  if (useMockData) {
+    return { ...getMockQuote(ticker), isMock: true };
+  }
+  
+  const upperTicker = ticker.toUpperCase();
+  const url = `${BASE_URL}/quote/${upperTicker}?apikey=${API_KEY}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`FMP API request failed with status ${response.status}`);
+    }
+    const data = await response.json();
+    
+    if (!data || data.length === 0) {
+        throw new Error(`No data found for ticker: ${upperTicker}`);
+    }
+
+    const quoteData = data[0];
+    
+    // Cache the real name and price for mock fallback consistency
+    mockPriceCache[upperTicker] = { price: quoteData.price, companyName: quoteData.name };
+
+    return {
+      ticker: quoteData.symbol,
+      companyName: quoteData.name,
+      price: quoteData.price,
+      volume: quoteData.volume,
+      dayHigh: quoteData.dayHigh,
+      dayLow: quoteData.dayLow,
+      previousClose: quoteData.previousClose,
+      isMock: false
+    };
+  } catch (error) {
+    console.error(`Failed to fetch quote for ${ticker}, falling back to mock data:`, error);
+    useMockData = true; // Latch to mock data for the rest of the session
+    return { ...getMockQuote(ticker), isMock: true };
+  }
+};
+
+export const fetchHistoricalData = async (ticker: string, days: number): Promise<{data: {date: string, price: number}[], isMock: boolean}> => {
+    if (useMockData) {
+        return { data: getMockHistoricalData(ticker, days), isMock: true };
+    }
+    
+    const upperTicker = ticker.toUpperCase();
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - days);
+
+    const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
+    const url = `${BASE_URL}/historical-price-full/${upperTicker}?from=${formatDate(startDate)}&to=${formatDate(endDate)}&apikey=${API_KEY}`;
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`FMP API request failed for historical data with status ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (!data || !data.historical) {
+            console.warn(`No historical data for ${upperTicker}`);
+            return { data: [], isMock: false };
+        }
+
+        const historical = data.historical
+            .map((item: any) => ({
+                date: item.date,
+                price: item.close,
+            }))
+            .reverse();
+        
+        return { data: historical, isMock: false };
+            
+    } catch (error) {
+        console.error(`Failed to fetch historical data for ${ticker}, falling back to mock data:`, error);
+        useMockData = true; // Latch to mock data for the rest of the session
+        return { data: getMockHistoricalData(ticker, days), isMock: true };
+    }
 };

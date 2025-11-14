@@ -14,6 +14,7 @@ import { ChatBot } from './components/ChatBot';
 import { PortfolioPerformanceChart } from './components/PortfolioPerformanceChart';
 import { ChangelogModal } from './components/ChangelogModal';
 import { changelog, LATEST_CHANGELOG_VERSION } from './constants';
+import { ApiErrorBanner } from './components/ApiErrorBanner';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -27,6 +28,7 @@ const App: React.FC = () => {
   });
 
   const [marketData, setMarketData] = useState<{[key: string]: Omit<Position, 'shares' | 'averageCost' | 'ticker' | 'companyName'>}>({});
+  const [historicalPrices, setHistoricalPrices] = useState<{ [key: string]: { date: string, price: number }[] }>({});
   const [isLoading, setIsLoading] = useState(true);
   
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -36,6 +38,8 @@ const App: React.FC = () => {
   const [hasSeenLatestUpdate, setHasSeenLatestUpdate] = useState(() => {
     return localStorage.getItem('seenChangelogVersion') === LATEST_CHANGELOG_VERSION.toString();
   });
+
+  const [apiError, setApiError] = useState<boolean>(false);
 
   const handleOpenChangelog = () => {
     setIsChangelogOpen(true);
@@ -86,43 +90,80 @@ const App: React.FC = () => {
     
     try {
       const quotes = await Promise.all(tickers.map(ticker => fetchQuote(ticker)));
+      
+      if (!apiError && quotes.some(q => q?.isMock)) {
+        setApiError(true);
+      }
+
       setMarketData(prevData => {
         const newData = { ...prevData };
         quotes.forEach(q => {
-          newData[q.ticker] = {
-            currentPrice: q.price,
-            volume: q.volume,
-            dayHigh: q.dayHigh,
-            dayLow: q.dayLow,
-            previousClose: q.previousClose,
-          };
+          if (q) {
+            newData[q.ticker] = {
+              currentPrice: q.price,
+              volume: q.volume,
+              dayHigh: q.dayHigh,
+              dayLow: q.dayLow,
+              previousClose: q.previousClose,
+            };
+          }
         });
         return newData;
       });
     } catch (error) {
       console.error("Failed to fetch market data", error);
+      setApiError(true);
     } finally {
         if (isLoading) setIsLoading(false);
     }
-  }, [transactions, isLoading]);
+  }, [transactions, isLoading, apiError]);
 
   useEffect(() => {
     fetchAllMarketData();
-    const interval = setInterval(fetchAllMarketData, 30000);
+    const interval = setInterval(fetchAllMarketData, 60000); // Check for new prices every minute
     return () => clearInterval(interval);
   }, [transactions]);
+  
+  useEffect(() => {
+    const fetchAllHistoricalData = async () => {
+      const tickers = [...new Set(transactions.map(t => t.ticker))];
+      if (tickers.length === 0) {
+          setHistoricalPrices({});
+          return;
+      }
+
+      try {
+        const historicalDataPromises = tickers.map(ticker =>
+          fetchHistoricalData(ticker, 30).then(result => ({ ticker, result }))
+        );
+        const results = await Promise.all(historicalDataPromises);
+
+        if (!apiError && results.some(r => r.result.isMock)) {
+            setApiError(true);
+        }
+
+        const newHistoricalPrices = results.reduce((acc, { ticker, result }) => {
+          acc[ticker] = result.data;
+          return acc;
+        }, {} as { [key: string]: { date: string, price: number }[] });
+
+        setHistoricalPrices(newHistoricalPrices);
+      } catch (error) {
+        console.error("Failed to fetch historical data for chart", error);
+        setApiError(true);
+      }
+    };
+
+    fetchAllHistoricalData();
+  }, [transactions, apiError]);
 
   const historicalData = useMemo(() => {
     const data: HistoricalDataPoint[] = [];
-    if (transactions.length === 0) return data;
+    if (transactions.length === 0 || Object.keys(historicalPrices).length === 0) return data;
   
-    const tickers = [...new Set(transactions.map(t => t.ticker))];
-    const historicalPrices: { [key: string]: { [key: string]: number } } = {};
-  
-    // This is a simplified mock. In a real app, you'd fetch this properly.
-    tickers.forEach(ticker => {
-        const prices = fetchHistoricalData(ticker, 30);
-        historicalPrices[ticker] = Object.fromEntries(prices.map(p => [p.date, p.price]));
+    const pricesLookup: { [key: string]: { [key: string]: number } } = {};
+    Object.entries(historicalPrices).forEach(([ticker, priceData]) => {
+        pricesLookup[ticker] = Object.fromEntries(priceData.map(p => [p.date, p.price]));
     });
 
     const today = new Date();
@@ -150,15 +191,15 @@ const App: React.FC = () => {
 
         // Calculate market value for that day
         Object.entries(dailyPositions).forEach(([ticker, shares]) => {
-            if (shares > 0 && historicalPrices[ticker]?.[dateString]) {
-                dailyValue += shares * historicalPrices[ticker][dateString];
+            if (shares > 0 && pricesLookup[ticker]?.[dateString]) {
+                dailyValue += shares * pricesLookup[ticker][dateString];
             }
         });
         
         data.push({ date: dateString, value: dailyValue });
     }
     return data;
-  }, [transactions]);
+  }, [transactions, historicalPrices]);
 
   const addTransaction = useCallback(async (newTransaction: Omit<Transaction, 'id'>) => {
     setTransactions(prev => [...prev, { ...newTransaction, id: Date.now().toString() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
@@ -190,6 +231,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
       <Header onOpenChangelog={handleOpenChangelog} showUpdateBadge={!hasSeenLatestUpdate} />
+      {apiError && <ApiErrorBanner onDismiss={() => setApiError(false)} />}
       <main className="container mx-auto p-4 md:p-8">
         <div className="mb-8">
           <PortfolioSummary data={summaryData} />
