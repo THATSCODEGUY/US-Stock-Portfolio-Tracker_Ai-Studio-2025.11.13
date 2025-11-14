@@ -8,9 +8,10 @@ interface TransactionHistoryTableProps {
   onDelete: (tx: Transaction) => void;
   onImport: (file: File) => void;
   onExport: (format: 'json' | 'csv') => void;
+  onExportAll: (format: 'json' | 'csv') => void;
 }
 
-export const TransactionHistoryTable: React.FC<TransactionHistoryTableProps> = ({ transactions, onEdit, onDelete, onImport, onExport }) => {
+export const TransactionHistoryTable: React.FC<TransactionHistoryTableProps> = ({ transactions, onEdit, onDelete, onImport, onExport, onExportAll }) => {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportClick = () => {
@@ -21,7 +22,6 @@ export const TransactionHistoryTable: React.FC<TransactionHistoryTableProps> = (
     const file = event.target.files?.[0];
     if (file) {
       onImport(file);
-      // Reset input value to allow importing the same file again
       if (importInputRef.current) {
         importInputRef.current.value = '';
       }
@@ -32,7 +32,7 @@ export const TransactionHistoryTable: React.FC<TransactionHistoryTableProps> = (
     <div>
       <div className="flex flex-wrap gap-4 justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-white">Transaction History</h2>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center flex-wrap gap-2">
            <button 
               onClick={handleImportClick} 
               className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
@@ -41,20 +41,37 @@ export const TransactionHistoryTable: React.FC<TransactionHistoryTableProps> = (
              Import
            </button>
            <input type="file" ref={importInputRef} onChange={handleFileChange} accept=".json,.csv" className="hidden" />
+           
+           <div className="h-6 border-l border-gray-600 mx-2"></div>
 
+           <span className="text-sm text-gray-400">Export Active:</span>
            <button 
              onClick={() => onExport('json')} 
              className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
            >
-             <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-             Export JSON
+             JSON
            </button>
            <button 
              onClick={() => onExport('csv')} 
              className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
            >
-             <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-             Export CSV
+             CSV
+           </button>
+
+           <div className="h-6 border-l border-gray-600 mx-2"></div>
+           
+           <span className="text-sm text-gray-400">Export All:</span>
+           <button 
+             onClick={() => onExportAll('json')} 
+             className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
+           >
+             JSON
+           </button>
+           <button 
+             onClick={() => onExportAll('csv')} 
+             className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
+           >
+             CSV
            </button>
         </div>
       </div>

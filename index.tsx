@@ -1,7 +1,16 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { v4 as uuidv4 } from 'uuid';
+
+// Make uuid available globally for simplicity in this project structure
+window.uuidv4 = uuidv4;
+
+declare global {
+    interface Window {
+        uuidv4: () => string;
+    }
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,4 +23,3 @@ root.render(
     <App />
   </React.StrictMode>
 );
-   

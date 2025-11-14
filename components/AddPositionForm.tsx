@@ -5,9 +5,10 @@ import { fetchQuote } from '../services/marketApi';
 
 interface AddTransactionFormProps {
   onAddTransaction: (newTransaction: Omit<Transaction, 'id'>) => Promise<void>;
+  disabled?: boolean;
 }
 
-export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransaction }) => {
+export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransaction, disabled = false }) => {
   const [ticker, setTicker] = useState('');
   const [shares, setShares] = useState('');
   const [price, setPrice] = useState('');
@@ -41,7 +42,6 @@ export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransa
         notes,
       });
 
-      // Reset form on success
       setTicker('');
       setShares('');
       setPrice('');
@@ -59,8 +59,10 @@ export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransa
     }
   };
 
+  const isFormDisabled = disabled || isLoading;
+
   return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow-lg sticky top-8">
+    <div className={`bg-gray-800 p-6 rounded-lg shadow-lg sticky top-8 ${disabled ? 'opacity-50' : ''}`}>
       <h3 className="text-xl font-bold mb-4 text-white flex items-center">
         <PlusCircleIcon className="h-6 w-6 mr-2 text-green-accent" />
         Add Transaction
@@ -70,11 +72,11 @@ export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransa
           <label className="block text-sm font-medium text-gray-300 mb-1">Type*</label>
           <div className="flex space-x-4">
             <label className="flex items-center">
-              <input type="radio" value="BUY" checked={type === 'BUY'} onChange={() => setType('BUY')} className="form-radio h-4 w-4 text-green-accent bg-gray-700 border-gray-600 focus:ring-green-accent" disabled={isLoading} />
+              <input type="radio" value="BUY" checked={type === 'BUY'} onChange={() => setType('BUY')} className="form-radio h-4 w-4 text-green-accent bg-gray-700 border-gray-600 focus:ring-green-accent" disabled={isFormDisabled} />
               <span className="ml-2 text-white">Buy</span>
             </label>
             <label className="flex items-center">
-              <input type="radio" value="SELL" checked={type === 'SELL'} onChange={() => setType('SELL')} className="form-radio h-4 w-4 text-red-accent bg-gray-700 border-gray-600 focus:ring-red-accent" disabled={isLoading}/>
+              <input type="radio" value="SELL" checked={type === 'SELL'} onChange={() => setType('SELL')} className="form-radio h-4 w-4 text-red-accent bg-gray-700 border-gray-600 focus:ring-red-accent" disabled={isFormDisabled}/>
               <span className="ml-2 text-white">Sell</span>
             </label>
           </div>
@@ -90,7 +92,7 @@ export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransa
             className="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-accent focus:border-green-accent"
             required
             placeholder="e.g., AAPL"
-            disabled={isLoading}
+            disabled={isFormDisabled}
           />
         </div>
        
@@ -107,7 +109,7 @@ export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransa
               min="0"
               step="any"
               placeholder="10"
-              disabled={isLoading}
+              disabled={isFormDisabled}
             />
           </div>
           <div>
@@ -122,7 +124,7 @@ export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransa
               min="0"
               step="any"
               placeholder="150.75"
-              disabled={isLoading}
+              disabled={isFormDisabled}
             />
           </div>
         </div>
@@ -135,7 +137,7 @@ export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransa
             onChange={(e) => setDate(e.target.value)}
             className="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-accent focus:border-green-accent"
             required
-            disabled={isLoading}
+            disabled={isFormDisabled}
           />
         </div>
 
@@ -148,7 +150,7 @@ export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransa
             className="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-accent focus:border-green-accent"
             rows={2}
             placeholder="Optional"
-            disabled={isLoading}
+            disabled={isFormDisabled}
           />
         </div>
 
@@ -156,7 +158,7 @@ export const AddPositionForm: React.FC<AddTransactionFormProps> = ({ onAddTransa
         
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isFormDisabled}
           className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-accent hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? 'Verifying...' : 'Add Transaction'}

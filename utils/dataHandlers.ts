@@ -1,6 +1,5 @@
-import { type Transaction } from '../types';
+import { type Transaction, type PortfolioData } from '../types';
 
-// Function to trigger file download in the browser
 const downloadFile = (content: string, fileName: string, contentType: string) => {
     const blob = new Blob([content], { type: contentType });
     const link = document.createElement('a');
@@ -14,28 +13,62 @@ const downloadFile = (content: string, fileName: string, contentType: string) =>
 
 // --- EXPORT LOGIC ---
 
-export const exportTransactions = (transactions: Transaction[], format: 'json' | 'csv') => {
+export const exportTransactions = (transactions: Transaction[], format: 'json' | 'csv', accountName?: string) => {
+    const safeAccountName = accountName?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'account';
+    const fileName = `portfolio_backup_${safeAccountName}`;
+
     if (format === 'json') {
         const jsonString = JSON.stringify(transactions, null, 2);
-        downloadFile(jsonString, 'portfolio_backup.json', 'application/json');
+        downloadFile(jsonString, `${fileName}.json`, 'application/json');
     } else if (format === 'csv') {
         const headers = ['id', 'ticker', 'companyName', 'type', 'shares', 'price', 'date', 'notes'];
         const csvRows = [
             headers.join(','),
             ...transactions.map(tx => {
-                // Handle notes that might contain commas or quotes
                 const notes = tx.notes ? `"${tx.notes.replace(/"/g, '""')}"` : '';
                 return [tx.id, tx.ticker, `"${tx.companyName}"`, tx.type, tx.shares, tx.price, tx.date, notes].join(',');
             })
         ];
         const csvString = csvRows.join('\n');
-        downloadFile(csvString, 'portfolio_backup.csv', 'text/csv;charset=utf-8;');
+        downloadFile(csvString, `${fileName}.csv`, 'text/csv;charset=utf-8;');
     }
 };
 
+export const exportAllData = (data: PortfolioData, format: 'json' | 'csv') => {
+    if (format === 'json') {
+        const jsonString = JSON.stringify(data, null, 2);
+        downloadFile(jsonString, 'portfolio_full_backup.json', 'application/json');
+    } else if (format === 'csv') {
+        const headers = ['accountId', 'accountName', 'transactionId', 'ticker', 'companyName', 'type', 'shares', 'price', 'date', 'notes'];
+        const csvRows = [headers.join(',')];
+        
+        data.accounts.forEach(account => {
+            const accountTransactions = data.transactions[account.id] || [];
+            accountTransactions.forEach(tx => {
+                const notes = tx.notes ? `"${tx.notes.replace(/"/g, '""')}"` : '';
+                csvRows.push([
+                    account.id,
+                    `"${account.name}"`,
+                    tx.id,
+                    tx.ticker,
+                    `"${tx.companyName}"`,
+                    tx.type,
+                    tx.shares,
+                    tx.price,
+                    tx.date,
+                    notes
+                ].join(','));
+            });
+        });
+        
+        const csvString = csvRows.join('\n');
+        downloadFile(csvString, 'portfolio_full_backup.csv', 'text/csv;charset=utf-8;');
+    }
+};
+
+
 // --- IMPORT LOGIC ---
 
-// A simple CSV parser that handles quoted fields
 const parseCsv = (csvText: string): Transaction[] => {
     const lines = csvText.trim().split('\n');
     if (lines.length < 2) return [];
@@ -52,14 +85,12 @@ const parseCsv = (csvText: string): Transaction[] => {
         const txObject: { [key: string]: any } = {};
         headers.forEach((header, index) => {
             let value = values[index] || '';
-            // Remove quotes from start and end
             if (value.startsWith('"') && value.endsWith('"')) {
                 value = value.slice(1, -1).replace(/""/g, '"');
             }
             txObject[header] = value;
         });
         
-        // Type conversion and validation
         if (txObject.id && txObject.ticker) {
             transactions.push({
                 id: txObject.id,
@@ -77,7 +108,7 @@ const parseCsv = (csvText: string): Transaction[] => {
 };
 
 
-export const parseImportedFile = (file: File): Promise<Transaction[]> => {
+export const parseImportedFile = (file: File): Promise<Transaction[] | PortfolioData> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -85,11 +116,13 @@ export const parseImportedFile = (file: File): Promise<Transaction[]> => {
                 const content = event.target?.result as string;
                 if (file.type === 'application/json' || file.name.endsWith('.json')) {
                     const parsed = JSON.parse(content);
-                    // Basic validation to check if it's an array of transaction-like objects
-                    if (Array.isArray(parsed) && (parsed.length === 0 || (parsed[0].id && parsed[0].ticker))) {
-                        resolve(parsed);
+                    // Check if it's a full backup
+                    if (parsed.accounts && parsed.transactions && Array.isArray(parsed.accounts)) {
+                        resolve(parsed as PortfolioData);
+                    } else if (Array.isArray(parsed) && (parsed.length === 0 || (parsed[0].id && parsed[0].ticker))) {
+                        resolve(parsed as Transaction[]);
                     } else {
-                        reject(new Error('Invalid JSON format. Expected an array of transactions.'));
+                        reject(new Error('Invalid JSON format. Expected an array of transactions or a full portfolio backup file.'));
                     }
                 } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
                     resolve(parseCsv(content));

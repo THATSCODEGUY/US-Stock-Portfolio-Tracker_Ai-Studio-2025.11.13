@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { type Position, type Transaction, type HistoricalDataPoint } from './types';
+import { type Position, type Transaction, type HistoricalDataPoint, type Account, type PortfolioData } from './types';
 import { Header } from './components/Header';
 import { AddPositionForm } from './components/AddPositionForm';
 import { PortfolioTable } from './components/PortfolioTable';
@@ -15,33 +15,74 @@ import { PortfolioPerformanceChart } from './components/PortfolioPerformanceChar
 import { ChangelogModal } from './components/ChangelogModal';
 import { changelog, LATEST_CHANGELOG_VERSION } from './constants';
 import { ApiErrorBanner } from './components/ApiErrorBanner';
-import { exportTransactions, parseImportedFile } from './utils/dataHandlers';
+import { exportTransactions, parseImportedFile, exportAllData } from './utils/dataHandlers';
+import { ManageAccountsModal } from './components/ManageAccountsModal';
+import { v4 as uuidv4 } from 'uuid';
+
 
 const App: React.FC = () => {
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    try {
-      const saved = localStorage.getItem('stockPortfolioTransactions');
-      return saved ? JSON.parse(saved) : sampleTransactions;
-    } catch (error) {
-      console.error("Could not parse transactions from localStorage", error);
-      return sampleTransactions;
+  const [portfolioData, setPortfolioData] = useState<PortfolioData>(() => {
+    // Check for the new data structure first
+    const savedData = localStorage.getItem('portfolioManagerData');
+    if (savedData) {
+      try {
+        return JSON.parse(savedData);
+      } catch (e) {
+        console.error("Failed to parse portfolioManagerData", e);
+      }
     }
-  });
+    
+    // One-time migration from old structure
+    const oldTransactionsData = localStorage.getItem('stockPortfolioTransactions');
+    if (oldTransactionsData) {
+      try {
+        const oldTransactions = JSON.parse(oldTransactionsData);
+        const defaultAccount: Account = { id: uuidv4(), name: 'Default Account' };
+        const newData: PortfolioData = {
+          accounts: [defaultAccount],
+          transactions: { [defaultAccount.id]: oldTransactions },
+          activeAccountId: defaultAccount.id,
+        };
+        localStorage.setItem('portfolioManagerData', JSON.stringify(newData));
+        localStorage.removeItem('stockPortfolioTransactions'); // Clean up old data
+        return newData;
+      } catch (e) {
+         console.error("Failed to migrate old transaction data", e);
+      }
+    }
 
+    // Default state for new users
+    const defaultAccount: Account = { id: uuidv4(), name: 'Personal Portfolio' };
+    return {
+      accounts: [defaultAccount],
+      transactions: { [defaultAccount.id]: sampleTransactions },
+      activeAccountId: defaultAccount.id,
+    };
+  });
+  
+  const { accounts, transactions: allTransactions, activeAccountId } = portfolioData;
+  const activeAccount = useMemo(() => accounts.find(acc => acc.id === activeAccountId), [accounts, activeAccountId]);
+  
+  const transactions = useMemo(() => {
+    return (activeAccountId && allTransactions[activeAccountId]) || [];
+  }, [allTransactions, activeAccountId]);
+  
   const [marketData, setMarketData] = useState<{[key: string]: Omit<Position, 'shares' | 'averageCost' | 'ticker' | 'companyName'>}>({});
   const [historicalPrices, setHistoricalPrices] = useState<{ [key: string]: { date: string, price: number }[] }>({});
   const [isLoading, setIsLoading] = useState(true);
   
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
   
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
   const [hasSeenLatestUpdate, setHasSeenLatestUpdate] = useState(() => {
     return localStorage.getItem('seenChangelogVersion') === LATEST_CHANGELOG_VERSION.toString();
   });
 
   const [apiError, setApiError] = useState<boolean>(false);
-  const [pendingImport, setPendingImport] = useState<Transaction[] | null>(null);
+  const [pendingImport, setPendingImport] = useState<Transaction[] | PortfolioData | null>(null);
 
   const handleOpenChangelog = () => {
     setIsChangelogOpen(true);
@@ -50,8 +91,8 @@ const App: React.FC = () => {
   }
 
   useEffect(() => {
-    localStorage.setItem('stockPortfolioTransactions', JSON.stringify(transactions));
-  }, [transactions]);
+    localStorage.setItem('portfolioManagerData', JSON.stringify(portfolioData));
+  }, [portfolioData]);
 
   const positions = useMemo<Position[]>(() => {
     const portfolio: { [key: string]: { shares: number; totalCost: number; companyName: string } } = {};
@@ -72,7 +113,7 @@ const App: React.FC = () => {
     });
 
     return Object.entries(portfolio)
-      .filter(([, data]) => data.shares > 0.00001) // Filter out sold-off positions, allowing for float inaccuracies
+      .filter(([, data]) => data.shares > 0.00001)
       .map(([ticker, data]) => ({
         ticker,
         companyName: data.companyName,
@@ -87,6 +128,7 @@ const App: React.FC = () => {
     const tickers = [...new Set(transactions.map(t => t.ticker))];
     if (tickers.length === 0) {
       setIsLoading(false);
+      setMarketData({});
       return;
     }
     
@@ -121,8 +163,9 @@ const App: React.FC = () => {
   }, [transactions, isLoading, apiError]);
 
   useEffect(() => {
+    setIsLoading(true);
     fetchAllMarketData();
-    const interval = setInterval(fetchAllMarketData, 60000); // Check for new prices every minute
+    const interval = setInterval(fetchAllMarketData, 60000);
     return () => clearInterval(interval);
   }, [transactions]);
   
@@ -177,7 +220,6 @@ const App: React.FC = () => {
         let dailyValue = 0;
         const dailyPositions: { [key: string]: number } = {};
 
-        // Determine holdings on this specific day
         transactions.forEach(tx => {
             if (new Date(tx.date) <= date) {
                 if (!dailyPositions[tx.ticker]) {
@@ -191,7 +233,6 @@ const App: React.FC = () => {
             }
         });
 
-        // Calculate market value for that day
         Object.entries(dailyPositions).forEach(([ticker, shares]) => {
             if (shares > 0 && pricesLookup[ticker]?.[dateString]) {
                 dailyValue += shares * pricesLookup[ticker][dateString];
@@ -204,18 +245,44 @@ const App: React.FC = () => {
   }, [transactions, historicalPrices]);
 
   const addTransaction = useCallback(async (newTransaction: Omit<Transaction, 'id'>) => {
-    setTransactions(prev => [...prev, { ...newTransaction, id: Date.now().toString() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-  }, []);
+    if (!activeAccountId) return;
+    setPortfolioData(prev => {
+        const newTx = { ...newTransaction, id: uuidv4() };
+        const updatedTransactions = [...(prev.transactions[activeAccountId] || []), newTx]
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return {
+            ...prev,
+            transactions: {
+                ...prev.transactions,
+                [activeAccountId]: updatedTransactions
+            }
+        };
+    });
+  }, [activeAccountId]);
   
   const updateTransaction = useCallback((updatedTx: Transaction) => {
-     setTransactions(prev => prev.map(tx => tx.id === updatedTx.id ? updatedTx : tx));
-     setEditingTransaction(null);
-  }, []);
+    if (!activeAccountId) return;
+    setPortfolioData(prev => ({
+        ...prev,
+        transactions: {
+            ...prev.transactions,
+            [activeAccountId]: prev.transactions[activeAccountId].map(tx => tx.id === updatedTx.id ? updatedTx : tx)
+        }
+    }));
+    setEditingTransaction(null);
+  }, [activeAccountId]);
 
   const deleteTransaction = useCallback((id: string) => {
-    setTransactions(prev => prev.filter(p => p.id !== id));
+    if (!activeAccountId) return;
+    setPortfolioData(prev => ({
+        ...prev,
+        transactions: {
+            ...prev.transactions,
+            [activeAccountId]: prev.transactions[activeAccountId].filter(p => p.id !== id)
+        }
+    }));
     setTransactionToDelete(null);
-  }, []);
+  }, [activeAccountId]);
 
   const summaryData = useMemo(() => {
     const totalCostBasis = positions.reduce((acc, pos) => acc + pos.shares * pos.averageCost, 0);
@@ -230,29 +297,101 @@ const App: React.FC = () => {
     };
   }, [positions]);
 
+  // --- Account Management Handlers ---
+  const handleSwitchAccount = (id: string) => {
+    setPortfolioData(prev => ({ ...prev, activeAccountId: id }));
+  };
+
+  const handleAddAccount = (name: string) => {
+    const newAccount: Account = { id: uuidv4(), name };
+    setPortfolioData(prev => ({
+      ...prev,
+      accounts: [...prev.accounts, newAccount],
+      transactions: {
+        ...prev.transactions,
+        [newAccount.id]: []
+      },
+      activeAccountId: newAccount.id, // Switch to new account
+    }));
+  };
+
+  const handleUpdateAccount = (id: string, name: string) => {
+    setPortfolioData(prev => ({
+      ...prev,
+      accounts: prev.accounts.map(acc => acc.id === id ? { ...acc, name } : acc)
+    }));
+  };
+
+  const handleDeleteAccount = (id: string) => {
+    if (accounts.length <= 1) {
+      alert("Cannot delete the last account.");
+      return;
+    }
+    const { [id]: _, ...remainingTransactions } = allTransactions;
+    const remainingAccounts = accounts.filter(acc => acc.id !== id);
+    
+    setPortfolioData({
+      accounts: remainingAccounts,
+      transactions: remainingTransactions,
+      activeAccountId: remainingAccounts[0]?.id || null,
+    });
+    setAccountToDelete(null);
+  };
+  
+  // --- Import/Export Handlers ---
   const handleExport = (format: 'json' | 'csv') => {
-    exportTransactions(transactions, format);
+    exportTransactions(transactions, format, activeAccount?.name);
+  };
+
+  const handleExportAll = (format: 'json' | 'csv') => {
+    exportAllData(portfolioData, format);
   };
 
   const handleImport = async (file: File) => {
     try {
-        const importedTransactions = await parseImportedFile(file);
-        setPendingImport(importedTransactions);
+        const importedData = await parseImportedFile(file);
+        setPendingImport(importedData);
     } catch (error) {
         alert((error as Error).message);
     }
   };
 
   const confirmImport = () => {
-    if (pendingImport) {
-        setTransactions(pendingImport);
+    if (pendingImport && activeAccountId) {
+        // Check if it's a full data import or just transactions
+        if ('accounts' in pendingImport && 'transactions' in pendingImport) {
+          setPortfolioData(pendingImport as PortfolioData);
+        } else {
+          setPortfolioData(prev => ({
+            ...prev,
+            transactions: {
+              ...prev.transactions,
+              [activeAccountId]: pendingImport as Transaction[]
+            }
+          }))
+        }
         setPendingImport(null);
     }
+  };
+  
+  const getImportMessage = () => {
+    if (!pendingImport) return '';
+    if ('accounts' in pendingImport) {
+        return `This will replace ALL your data, including ${accounts.length} accounts and their transactions, with the data from the backup file. Are you sure?`;
+    }
+    return `This will replace all ${transactions.length} transactions in the '${activeAccount?.name}' account with the ${pendingImport.length} transactions from the imported file. Are you sure?`;
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
-      <Header onOpenChangelog={handleOpenChangelog} showUpdateBadge={!hasSeenLatestUpdate} />
+      <Header 
+        accounts={accounts}
+        activeAccount={activeAccount || null}
+        onSwitchAccount={handleSwitchAccount}
+        onManageAccounts={() => setIsManageAccountsOpen(true)}
+        onOpenChangelog={handleOpenChangelog} 
+        showUpdateBadge={!hasSeenLatestUpdate} 
+      />
       {apiError && <ApiErrorBanner onDismiss={() => setApiError(false)} />}
       <main className="container mx-auto p-4 md:p-8">
         <div className="mb-8">
@@ -279,11 +418,12 @@ const App: React.FC = () => {
                   onDelete={setTransactionToDelete} 
                   onImport={handleImport}
                   onExport={handleExport}
+                  onExportAll={handleExportAll}
                />
             </div>
           </div>
           <div className="lg:col-span-1">
-            <AddPositionForm onAddTransaction={addTransaction} />
+            <AddPositionForm onAddTransaction={addTransaction} disabled={!activeAccount} />
           </div>
         </div>
       </main>
@@ -306,15 +446,32 @@ const App: React.FC = () => {
           message={`Are you sure you want to delete this ${transactionToDelete.type} transaction for ${transactionToDelete.ticker}? This action cannot be undone.`}
         />
       )}
+      {accountToDelete && (
+         <ConfirmationModal
+          isOpen={!!accountToDelete}
+          onClose={() => setAccountToDelete(null)}
+          onConfirm={() => handleDeleteAccount(accountToDelete.id)}
+          title="Delete Account"
+          message={`Are you sure you want to permanently delete the account "${accountToDelete.name}" and all of its transactions? This action cannot be undone.`}
+        />
+      )}
       {pendingImport && (
         <ConfirmationModal
             isOpen={!!pendingImport}
             onClose={() => setPendingImport(null)}
             onConfirm={confirmImport}
             title="Confirm Import"
-            message={`This will replace all ${transactions.length} current transactions with the ${pendingImport.length} transactions from the imported file. Are you sure you want to continue?`}
+            message={getImportMessage()}
         />
       )}
+      <ManageAccountsModal 
+        isOpen={isManageAccountsOpen}
+        onClose={() => setIsManageAccountsOpen(false)}
+        accounts={accounts}
+        onAdd={handleAddAccount}
+        onUpdate={handleUpdateAccount}
+        onDelete={setAccountToDelete}
+      />
        <ChatBot positions={positions} summaryData={summaryData} />
        <ChangelogModal isOpen={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
     </div>

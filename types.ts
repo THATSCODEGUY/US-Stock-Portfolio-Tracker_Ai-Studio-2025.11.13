@@ -11,7 +11,17 @@ export interface Transaction {
   notes?: string;
 }
 
-// FIX: Add and export the 'Quote' interface to resolve a module import error in services/marketApi.ts.
+export interface Account {
+  id: string;
+  name: string;
+}
+
+export interface PortfolioData {
+  accounts: Account[];
+  transactions: { [accountId: string]: Transaction[] };
+  activeAccountId: string | null;
+}
+
 export interface Quote {
   ticker: string;
   companyName: string;

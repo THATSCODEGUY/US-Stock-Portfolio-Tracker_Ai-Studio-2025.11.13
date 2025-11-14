@@ -101,3 +101,27 @@ export const ArrowUpTrayIcon: React.FC<IconProps> = (props) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
   </svg>
 );
+
+export const UserGroupIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m-7.289 2.72a3 3 0 0 1-4.682-2.72 9.094 9.094 0 0 1 3.741-.479m7.289 2.72a8.97 8.97 0 0 1-7.289-2.72m0 0A8.97 8.97 0 0 1 12 5.25v.003m0 0A8.97 8.97 0 0 1 18 13.5m0 0v-3.375c0-.621-.503-1.125-1.125-1.125h-1.5c-.621 0-1.125.504-1.125 1.125v3.375m0 0a3 3 0 0 0 3.75 2.75 3 3 0 0 0 3.75-2.75m-7.5 0a3 3 0 0 1-3.75 2.75 3 3 0 0 1-3.75-2.75m7.5 0v3.375c0 .621.504 1.125 1.125 1.125h1.5c.621 0 1.125-.504 1.125-1.125v-3.375" />
+  </svg>
+);
+
+export const ChevronDownIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+  </svg>
+);
+
+export const Cog6ToothIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-1.007 1.11-1.226a2.25 2.25 0 0 1 2.593 1.226c.09.542.56 1.007 1.11 1.226a2.25 2.25 0 0 0 2.593-1.226c.542-.09 1.007-.56 1.226-1.11a2.25 2.25 0 0 1 1.226 2.593c-.09.542-.56 1.007-1.226 1.11a2.25 2.25 0 0 0-1.226 2.593c.09.542.56 1.007 1.226 1.11a2.25 2.25 0 0 1-1.226 2.593c-.542-.09-1.007-.56-1.11-1.226a2.25 2.25 0 0 0-2.593 1.226c-.542.09-1.007.56-1.226 1.11a2.25 2.25 0 0 1-2.593-1.226c.09-.542.56-1.007 1.11-1.226a2.25 2.25 0 0 0-2.593-1.226c-.542.09-1.007.56-1.226 1.11a2.25 2.25 0 0 1-1.226-2.593c.09-.542.56-1.007 1.226-1.11a2.25 2.25 0 0 0 1.226-2.593c-.09-.542-.56-1.007-1.226-1.11a2.25 2.25 0 0 1 1.226-2.593c.542.09 1.007.56 1.11 1.226a2.25 2.25 0 0 0 2.593 1.226ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" />
+  </svg>
+);
+
+export const PlusIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
