@@ -12,8 +12,10 @@ export interface Quote {
   previousClose: number;
 }
 
+const TICKER_CACHE_KEY = 'stockTickerCache';
+
 // A simple in-memory cache to make price fluctuations feel more "real"
-const tickerCache: { [key: string]: { basePrice: number, companyName: string } } = {
+const defaultTickerCache: { [key: string]: { basePrice: number, companyName: string } } = {
     'AAPL': { basePrice: 172.50, companyName: 'Apple Inc.' },
     'GOOGL': { basePrice: 135.80, companyName: 'Alphabet Inc.' },
     'TSLA': { basePrice: 225.40, companyName: 'Tesla, Inc.' },
@@ -22,6 +24,27 @@ const tickerCache: { [key: string]: { basePrice: number, companyName: string } }
     'MSFT': { basePrice: 330.00, companyName: 'Microsoft Corporation' }
 };
 
+const loadTickerCache = (): { [key: string]: { basePrice: number, companyName: string } } => {
+    try {
+        const savedCache = localStorage.getItem(TICKER_CACHE_KEY);
+        if (savedCache) {
+            return JSON.parse(savedCache);
+        }
+    } catch (error) {
+        console.error("Could not parse ticker cache from localStorage", error);
+    }
+    return defaultTickerCache;
+};
+
+const tickerCache = loadTickerCache();
+
+const saveTickerCache = () => {
+    try {
+        localStorage.setItem(TICKER_CACHE_KEY, JSON.stringify(tickerCache));
+    } catch (error) {
+        console.error("Could not save ticker cache to localStorage", error);
+    }
+}
 
 export const fetchQuote = (ticker: string): Promise<Quote> => {
   return new Promise((resolve, reject) => {
@@ -32,13 +55,14 @@ export const fetchQuote = (ticker: string): Promise<Quote> => {
         return reject(new Error(`Invalid ticker symbol: ${ticker}`));
       }
       
-      // If the ticker is new, dynamically add it to the cache.
+      // If the ticker is new, dynamically add it to the cache and save it.
       if (!tickerCache[upperTicker]) {
           console.log(`New ticker "${upperTicker}" detected. Generating mock data.`);
           tickerCache[upperTicker] = {
               basePrice: 50 + Math.random() * 450, // Assign a random base price between $50 and $500
-              companyName: `${upperTicker} Company Inc.` // Generate a placeholder name
+              companyName: `${upperTicker} Company` // Generate a placeholder name
           };
+          saveTickerCache();
       }
 
       const cacheEntry = tickerCache[upperTicker];
@@ -69,8 +93,9 @@ export const fetchHistoricalData = (ticker: string, days: number): {date: string
      if (!tickerCache[upperTicker]) {
           tickerCache[upperTicker] = {
               basePrice: 50 + Math.random() * 450,
-              companyName: `${upperTicker} Company Inc.`
+              companyName: `${upperTicker} Company`
           };
+          saveTickerCache();
       }
 
     const history: {date: string, price: number}[] = [];
