@@ -401,7 +401,7 @@ const App: React.FC = () => {
           <div className="lg:col-span-2 space-y-8">
              <div>
                 <h2 className="text-2xl font-bold mb-4 text-white">Portfolio Performance (30 Days)</h2>
-                <PortfolioPerformanceChart data={historicalData} />
+                <PortfolioPerformanceChart key={activeAccountId} data={historicalData} />
             </div>
              <div>
               <h2 className="text-2xl font-bold mb-4 text-white">Portfolio Distribution</h2>
