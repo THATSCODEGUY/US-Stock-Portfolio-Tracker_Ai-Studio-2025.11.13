@@ -12,6 +12,8 @@ import { TransactionHistoryTable } from './components/TransactionHistoryTable';
 import { PortfolioPieChart } from './components/PortfolioPieChart';
 import { ChatBot } from './components/ChatBot';
 import { PortfolioPerformanceChart } from './components/PortfolioPerformanceChart';
+import { ChangelogModal } from './components/ChangelogModal';
+import { changelog, LATEST_CHANGELOG_VERSION } from './constants';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -29,6 +31,17 @@ const App: React.FC = () => {
   
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const [hasSeenLatestUpdate, setHasSeenLatestUpdate] = useState(() => {
+    return localStorage.getItem('seenChangelogVersion') === LATEST_CHANGELOG_VERSION.toString();
+  });
+
+  const handleOpenChangelog = () => {
+    setIsChangelogOpen(true);
+    localStorage.setItem('seenChangelogVersion', LATEST_CHANGELOG_VERSION.toString());
+    setHasSeenLatestUpdate(true);
+  }
 
   useEffect(() => {
     localStorage.setItem('stockPortfolioTransactions', JSON.stringify(transactions));
@@ -176,7 +189,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
-      <Header />
+      <Header onOpenChangelog={handleOpenChangelog} showUpdateBadge={!hasSeenLatestUpdate} />
       <main className="container mx-auto p-4 md:p-8">
         <div className="mb-8">
           <PortfolioSummary data={summaryData} />
@@ -229,6 +242,7 @@ const App: React.FC = () => {
         />
       )}
        <ChatBot positions={positions} summaryData={summaryData} />
+       <ChangelogModal isOpen={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
     </div>
   );
 };

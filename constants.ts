@@ -1,5 +1,28 @@
 import { type Transaction } from './types';
 
+export const LATEST_CHANGELOG_VERSION = 3;
+
+export const changelog = [
+  {
+    version: 3,
+    date: '2024-07-28',
+    title: 'Track Updates with "What\'s New"',
+    description: 'Added a changelog modal, accessible from the header, to keep you informed about the latest features and improvements.'
+  },
+  {
+    version: 2,
+    date: '2024-07-27',
+    title: 'Visualize Performance Over Time',
+    description: 'Introduced a 30-day portfolio performance line chart to help you track the historical value of your holdings.'
+  },
+  {
+    version: 1,
+    date: '2024-07-26',
+    title: 'Portfolio Assistant Chatbot',
+    description: 'Added a new AI-powered chatbot to answer questions about your portfolio in plain English. Find it in the bottom-right corner!'
+  }
+];
+
 export const sampleTransactions: Transaction[] = [
   {
     id: '1',
