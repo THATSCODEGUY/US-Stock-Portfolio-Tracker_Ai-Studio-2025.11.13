@@ -27,6 +27,8 @@ const CHART_COLORS = [
 export const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ positions }) => {
     const chartRef = useRef<HTMLCanvasElement | null>(null);
     const chartInstance = useRef<any>(null);
+    
+    const totalMarketValue = positions.reduce((acc, pos) => acc + (pos.shares * pos.currentPrice), 0);
 
     useEffect(() => {
         if (!chartRef.current || !window.Chart) {
@@ -62,13 +64,7 @@ export const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ positions 
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'right',
-                            labels: {
-                                color: '#d1d5db', // gray-300
-                                font: {
-                                    size: 14,
-                                }
-                            }
+                           display: false, // Disable default legend
                         },
                         tooltip: {
                             callbacks: {
@@ -90,7 +86,6 @@ export const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ positions 
             });
         }
         
-        // Cleanup function
         return () => {
             if (chartInstance.current) {
                 chartInstance.current.destroy();
@@ -112,8 +107,24 @@ export const PortfolioPieChart: React.FC<PortfolioPieChartProps> = ({ positions 
     }
 
     return (
-        <div className="bg-gray-800 rounded-lg shadow-lg p-4 h-80">
-            <canvas ref={chartRef}></canvas>
+        <div className="bg-gray-800 rounded-lg shadow-lg p-4 h-80 flex items-center justify-center space-x-6">
+            <div className="relative h-full w-1/2 max-w-[280px]">
+                <canvas ref={chartRef}></canvas>
+            </div>
+            <div className="flex flex-col justify-center space-y-3">
+                {positions.map((pos, index) => {
+                    const marketValue = pos.shares * pos.currentPrice;
+                    const percentage = totalMarketValue > 0 ? (marketValue / totalMarketValue) * 100 : 0;
+                    const color = CHART_COLORS[index % CHART_COLORS.length];
+                    return (
+                        <div key={pos.ticker} className="flex items-center text-sm font-medium">
+                            <span className="w-12 text-right text-gray-400 mr-2">{percentage.toFixed(1)}%</span>
+                            <div style={{ backgroundColor: color }} className="w-4 h-4 rounded-sm mr-3"></div>
+                            <span className="text-gray-200">{pos.ticker}</span>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 };
