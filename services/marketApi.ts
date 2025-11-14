@@ -56,9 +56,9 @@ const getMockHistoricalData = (ticker: string, days: number): {date: string, pri
 };
 
 
-// The key user provided which causes 403 errors
+// The key user provided
 const API_KEY = 'sneLo8y5QzmJCQqdaqZCZ1n4tyNI2Rgn';
-const BASE_URL = 'https://financialmodelingprep.com/api/v3';
+const BASE_URL = 'https://financialmodelingprep.com/stable';
 
 // The API now returns an object indicating if the data is mocked
 export const fetchQuote = async (ticker: string): Promise<Quote & { isMock: boolean }> => {
@@ -67,7 +67,8 @@ export const fetchQuote = async (ticker: string): Promise<Quote & { isMock: bool
   }
   
   const upperTicker = ticker.toUpperCase();
-  const url = `${BASE_URL}/quote/${upperTicker}?apikey=${API_KEY}`;
+  // FIX: Corrected the endpoint to use '/stable' and the 'symbol' query parameter.
+  const url = `${BASE_URL}/quote?symbol=${upperTicker}&apikey=${API_KEY}`;
   
   try {
     const response = await fetch(url);
@@ -108,13 +109,10 @@ export const fetchHistoricalData = async (ticker: string, days: number): Promise
     }
     
     const upperTicker = ticker.toUpperCase();
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - days);
-
-    const formatDate = (date: Date) => date.toISOString().split('T')[0];
-
-    const url = `${BASE_URL}/historical-price-full/${upperTicker}?from=${formatDate(startDate)}&to=${formatDate(endDate)}&apikey=${API_KEY}`;
+    
+    // FIX: Corrected the endpoint to use '/stable' and the 'symbol' query parameter.
+    // Inferred the historical endpoint based on the quote endpoint pattern.
+    const url = `${BASE_URL}/historical-price-full?symbol=${upperTicker}&timeseries=${days}&apikey=${API_KEY}`;
     
     try {
         const response = await fetch(url);
