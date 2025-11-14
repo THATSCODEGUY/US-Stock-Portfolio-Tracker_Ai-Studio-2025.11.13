@@ -15,6 +15,7 @@ import { PortfolioPerformanceChart } from './components/PortfolioPerformanceChar
 import { ChangelogModal } from './components/ChangelogModal';
 import { changelog, LATEST_CHANGELOG_VERSION } from './constants';
 import { ApiErrorBanner } from './components/ApiErrorBanner';
+import { exportTransactions, parseImportedFile } from './utils/dataHandlers';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -40,6 +41,7 @@ const App: React.FC = () => {
   });
 
   const [apiError, setApiError] = useState<boolean>(false);
+  const [pendingImport, setPendingImport] = useState<Transaction[] | null>(null);
 
   const handleOpenChangelog = () => {
     setIsChangelogOpen(true);
@@ -228,6 +230,26 @@ const App: React.FC = () => {
     };
   }, [positions]);
 
+  const handleExport = (format: 'json' | 'csv') => {
+    exportTransactions(transactions, format);
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+        const importedTransactions = await parseImportedFile(file);
+        setPendingImport(importedTransactions);
+    } catch (error) {
+        alert((error as Error).message);
+    }
+  };
+
+  const confirmImport = () => {
+    if (pendingImport) {
+        setTransactions(pendingImport);
+        setPendingImport(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
       <Header onOpenChangelog={handleOpenChangelog} showUpdateBadge={!hasSeenLatestUpdate} />
@@ -251,11 +273,12 @@ const App: React.FC = () => {
               <PortfolioTable positions={positions} isLoading={isLoading} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold mb-4 text-white">Transaction History</h2>
                <TransactionHistoryTable 
                   transactions={transactions} 
                   onEdit={setEditingTransaction} 
                   onDelete={setTransactionToDelete} 
+                  onImport={handleImport}
+                  onExport={handleExport}
                />
             </div>
           </div>
@@ -281,6 +304,15 @@ const App: React.FC = () => {
           onConfirm={() => deleteTransaction(transactionToDelete.id)}
           title="Delete Transaction"
           message={`Are you sure you want to delete this ${transactionToDelete.type} transaction for ${transactionToDelete.ticker}? This action cannot be undone.`}
+        />
+      )}
+      {pendingImport && (
+        <ConfirmationModal
+            isOpen={!!pendingImport}
+            onClose={() => setPendingImport(null)}
+            onConfirm={confirmImport}
+            title="Confirm Import"
+            message={`This will replace all ${transactions.length} current transactions with the ${pendingImport.length} transactions from the imported file. Are you sure you want to continue?`}
         />
       )}
        <ChatBot positions={positions} summaryData={summaryData} />
