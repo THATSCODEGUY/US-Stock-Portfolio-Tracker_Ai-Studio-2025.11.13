@@ -14,6 +14,7 @@ export interface Transaction {
 export interface Account {
   id: string;
   name: string;
+  cash: number;
 }
 
 export interface PortfolioData {

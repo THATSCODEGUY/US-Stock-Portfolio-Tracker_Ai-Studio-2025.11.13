@@ -26,7 +26,12 @@ const App: React.FC = () => {
     const savedData = localStorage.getItem('portfolioManagerData');
     if (savedData) {
       try {
-        return JSON.parse(savedData);
+        const parsedData = JSON.parse(savedData);
+        // Data migration for adding cash property
+        if (parsedData.accounts && parsedData.accounts.some((acc: Account) => acc.cash === undefined)) {
+            parsedData.accounts = parsedData.accounts.map((acc: Account) => ({ ...acc, cash: acc.cash || 0 }));
+        }
+        return parsedData;
       } catch (e) {
         console.error("Failed to parse portfolioManagerData", e);
       }
@@ -37,7 +42,7 @@ const App: React.FC = () => {
     if (oldTransactionsData) {
       try {
         const oldTransactions = JSON.parse(oldTransactionsData);
-        const defaultAccount: Account = { id: uuidv4(), name: 'Default Account' };
+        const defaultAccount: Account = { id: uuidv4(), name: 'Default Account', cash: 0 };
         const newData: PortfolioData = {
           accounts: [defaultAccount],
           transactions: { [defaultAccount.id]: oldTransactions },
@@ -52,7 +57,7 @@ const App: React.FC = () => {
     }
 
     // Default state for new users
-    const defaultAccount: Account = { id: uuidv4(), name: 'Personal Portfolio' };
+    const defaultAccount: Account = { id: uuidv4(), name: 'Personal Portfolio', cash: 0 };
     return {
       accounts: [defaultAccount],
       transactions: { [defaultAccount.id]: sampleTransactions },
@@ -294,8 +299,9 @@ const App: React.FC = () => {
       totalMarketValue,
       totalGainLoss,
       totalGainLossPercent,
+      tradingCash: activeAccount?.cash || 0,
     };
-  }, [positions]);
+  }, [positions, activeAccount]);
 
   // --- Account Management Handlers ---
   const handleSwitchAccount = (id: string) => {
@@ -303,7 +309,7 @@ const App: React.FC = () => {
   };
 
   const handleAddAccount = (name: string) => {
-    const newAccount: Account = { id: uuidv4(), name };
+    const newAccount: Account = { id: uuidv4(), name, cash: 0 };
     setPortfolioData(prev => ({
       ...prev,
       accounts: [...prev.accounts, newAccount],
@@ -319,6 +325,13 @@ const App: React.FC = () => {
     setPortfolioData(prev => ({
       ...prev,
       accounts: prev.accounts.map(acc => acc.id === id ? { ...acc, name } : acc)
+    }));
+  };
+
+  const handleUpdateAccountCash = (id: string, cash: number) => {
+    setPortfolioData(prev => ({
+      ...prev,
+      accounts: prev.accounts.map(acc => acc.id === id ? { ...acc, cash } : acc)
     }));
   };
 
@@ -395,7 +408,10 @@ const App: React.FC = () => {
       {apiError && <ApiErrorBanner onDismiss={() => setApiError(false)} />}
       <main className="container mx-auto p-4 md:p-8">
         <div className="mb-8">
-          <PortfolioSummary data={summaryData} />
+          <PortfolioSummary 
+            data={summaryData} 
+            onUpdateCash={(newCash) => activeAccount && handleUpdateAccountCash(activeAccount.id, newCash)}
+          />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">

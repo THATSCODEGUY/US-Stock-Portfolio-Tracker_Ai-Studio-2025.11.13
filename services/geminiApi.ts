@@ -5,12 +5,13 @@ interface SummaryData {
   totalMarketValue: number;
   totalGainLoss: number;
   totalGainLossPercent: number;
+  tradingCash: number;
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const systemInstruction = `You are a helpful and friendly US stock portfolio assistant.
-Analyze the provided JSON data which contains the user's current portfolio positions and a summary.
+Analyze the provided JSON data which contains the user's current portfolio positions, trading cash, and a summary.
 The user will ask questions about their portfolio. Provide concise and accurate answers based *only* on the data provided.
 Format numerical values as currency where appropriate (e.g., $1,234.56).
 Do not provide financial advice or make any predictions.
