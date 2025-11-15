@@ -1,4 +1,4 @@
-import { type Transaction, type PortfolioData } from '../types';
+import { type Transaction, type PortfolioData, type Account } from '../types';
 
 const downloadFile = (content: string, fileName: string, contentType: string) => {
     const blob = new Blob([content], { type: contentType });
@@ -13,20 +13,30 @@ const downloadFile = (content: string, fileName: string, contentType: string) =>
 
 // --- EXPORT LOGIC ---
 
-export const exportTransactions = (transactions: Transaction[], format: 'json' | 'csv', accountName?: string) => {
-    const safeAccountName = accountName?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'account';
+export const exportTransactions = (transactions: Transaction[], account: Account | null, format: 'json' | 'csv') => {
+    if (!account) return;
+    const safeAccountName = account.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const fileName = `portfolio_backup_${safeAccountName}`;
 
     if (format === 'json') {
-        const jsonString = JSON.stringify(transactions, null, 2);
+        // New: Export a structured object with both account details (including cash) and transactions.
+        const exportData = {
+            account: {
+                name: account.name,
+                cash: account.cash,
+            },
+            transactions,
+        };
+        const jsonString = JSON.stringify(exportData, null, 2);
         downloadFile(jsonString, `${fileName}.json`, 'application/json');
     } else if (format === 'csv') {
-        const headers = ['id', 'ticker', 'companyName', 'type', 'shares', 'price', 'date', 'notes'];
+        // New: Add 'accountCash' column.
+        const headers = ['id', 'ticker', 'companyName', 'type', 'shares', 'price', 'date', 'notes', 'accountCash'];
         const csvRows = [
             headers.join(','),
             ...transactions.map(tx => {
                 const notes = tx.notes ? `"${tx.notes.replace(/"/g, '""')}"` : '';
-                return [tx.id, tx.ticker, `"${tx.companyName}"`, tx.type, tx.shares, tx.price, tx.date, notes].join(',');
+                return [tx.id, tx.ticker, `"${tx.companyName}"`, tx.type, tx.shares, tx.price, tx.date, notes, account.cash].join(',');
             })
         ];
         const csvString = csvRows.join('\n');
@@ -36,10 +46,12 @@ export const exportTransactions = (transactions: Transaction[], format: 'json' |
 
 export const exportAllData = (data: PortfolioData, format: 'json' | 'csv') => {
     if (format === 'json') {
+        // This is already correct as it saves the full data structure.
         const jsonString = JSON.stringify(data, null, 2);
         downloadFile(jsonString, 'portfolio_full_backup.json', 'application/json');
     } else if (format === 'csv') {
-        const headers = ['accountId', 'accountName', 'transactionId', 'ticker', 'companyName', 'type', 'shares', 'price', 'date', 'notes'];
+        // New: Add 'accountCash' column.
+        const headers = ['accountId', 'accountName', 'accountCash', 'transactionId', 'ticker', 'companyName', 'type', 'shares', 'price', 'date', 'notes'];
         const csvRows = [headers.join(',')];
         
         data.accounts.forEach(account => {
@@ -49,6 +61,7 @@ export const exportAllData = (data: PortfolioData, format: 'json' | 'csv') => {
                 csvRows.push([
                     account.id,
                     `"${account.name}"`,
+                    account.cash, // Add account cash to each row
                     tx.id,
                     tx.ticker,
                     `"${tx.companyName}"`,
@@ -91,9 +104,11 @@ const parseCsv = (csvText: string): Transaction[] => {
             txObject[header] = value;
         });
         
-        if (txObject.id && txObject.ticker) {
+        const id = txObject.id || txObject.transactionId; // Handle both single and all export formats
+
+        if (id && txObject.ticker) {
             transactions.push({
-                id: txObject.id,
+                id,
                 ticker: txObject.ticker,
                 companyName: txObject.companyName,
                 type: txObject.type === 'BUY' || txObject.type === 'SELL' ? txObject.type : 'BUY',
@@ -108,7 +123,13 @@ const parseCsv = (csvText: string): Transaction[] => {
 };
 
 
-export const parseImportedFile = (file: File): Promise<Transaction[] | PortfolioData> => {
+// New: Define a type for the single-account backup format
+type SingleAccountBackup = {
+  account: { name: string; cash: number };
+  transactions: Transaction[];
+}
+
+export const parseImportedFile = (file: File): Promise<Transaction[] | PortfolioData | SingleAccountBackup> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -116,15 +137,20 @@ export const parseImportedFile = (file: File): Promise<Transaction[] | Portfolio
                 const content = event.target?.result as string;
                 if (file.type === 'application/json' || file.name.endsWith('.json')) {
                     const parsed = JSON.parse(content);
-                    // Check if it's a full backup
+                    // Check for full backup format
                     if (parsed.accounts && parsed.transactions && Array.isArray(parsed.accounts)) {
                         resolve(parsed as PortfolioData);
+                    // Check for new single-account backup format
+                    } else if (parsed.account && parsed.transactions && typeof parsed.account === 'object') {
+                        resolve(parsed as SingleAccountBackup);
+                    // Check for simple transaction list format
                     } else if (Array.isArray(parsed) && (parsed.length === 0 || (parsed[0].id && parsed[0].ticker))) {
                         resolve(parsed as Transaction[]);
                     } else {
                         reject(new Error('Invalid JSON format. Expected an array of transactions or a full portfolio backup file.'));
                     }
                 } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    // CSV import only restores transactions, not cash balances, due to its flat structure.
                     resolve(parseCsv(content));
                 } else {
                     reject(new Error('Unsupported file type. Please upload a .json or .csv file.'));

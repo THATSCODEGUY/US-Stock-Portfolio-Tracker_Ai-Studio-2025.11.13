@@ -19,6 +19,11 @@ import { exportTransactions, parseImportedFile, exportAllData } from './utils/da
 import { ManageAccountsModal } from './components/ManageAccountsModal';
 import { v4 as uuidv4 } from 'uuid';
 
+// New: Define a type for the single-account backup format
+type SingleAccountBackup = {
+  account: { name: string; cash: number };
+  transactions: Transaction[];
+}
 
 const App: React.FC = () => {
   const [portfolioData, setPortfolioData] = useState<PortfolioData>(() => {
@@ -87,7 +92,7 @@ const App: React.FC = () => {
   });
 
   const [apiError, setApiError] = useState<boolean>(false);
-  const [pendingImport, setPendingImport] = useState<Transaction[] | PortfolioData | null>(null);
+  const [pendingImport, setPendingImport] = useState<Transaction[] | PortfolioData | SingleAccountBackup | null>(null);
 
   const handleOpenChangelog = () => {
     setIsChangelogOpen(true);
@@ -353,7 +358,7 @@ const App: React.FC = () => {
   
   // --- Import/Export Handlers ---
   const handleExport = (format: 'json' | 'csv') => {
-    exportTransactions(transactions, format, activeAccount?.name);
+    exportTransactions(transactions, activeAccount, format);
   };
 
   const handleExportAll = (format: 'json' | 'csv') => {
@@ -371,10 +376,23 @@ const App: React.FC = () => {
 
   const confirmImport = () => {
     if (pendingImport && activeAccountId) {
-        // Check if it's a full data import or just transactions
-        if ('accounts' in pendingImport && 'transactions' in pendingImport) {
+        if ('accounts' in pendingImport && 'transactions' in pendingImport) { // Full backup
           setPortfolioData(pendingImport as PortfolioData);
-        } else {
+        } else if ('account' in pendingImport && 'transactions' in pendingImport) { // Single account backup
+            const singleAccountImport = pendingImport as SingleAccountBackup;
+            setPortfolioData(prev => ({
+                ...prev,
+                accounts: prev.accounts.map(acc => 
+                    acc.id === activeAccountId 
+                    ? { ...acc, cash: singleAccountImport.account.cash } 
+                    : acc
+                ),
+                transactions: {
+                    ...prev.transactions,
+                    [activeAccountId]: singleAccountImport.transactions
+                }
+            }));
+        } else { // Simple transaction list
           setPortfolioData(prev => ({
             ...prev,
             transactions: {
@@ -392,7 +410,12 @@ const App: React.FC = () => {
     if ('accounts' in pendingImport) {
         return `This will replace ALL your data, including ${accounts.length} accounts and their transactions, with the data from the backup file. Are you sure?`;
     }
-    return `This will replace all ${transactions.length} transactions in the '${activeAccount?.name}' account with the ${pendingImport.length} transactions from the imported file. Are you sure?`;
+    if ('account' in pendingImport && 'transactions' in pendingImport) {
+        const singleAccountImport = pendingImport as SingleAccountBackup;
+        const cashFormatted = singleAccountImport.account.cash.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+        return `This will replace all transactions and set the cash balance to ${cashFormatted} for the '${activeAccount?.name}' account. Are you sure?`;
+    }
+    return `This will replace all ${transactions.length} transactions in the '${activeAccount?.name}' account with the ${pendingImport.length} transactions from the imported file. This will NOT affect the account's cash balance. Are you sure?`;
   };
 
   return (
