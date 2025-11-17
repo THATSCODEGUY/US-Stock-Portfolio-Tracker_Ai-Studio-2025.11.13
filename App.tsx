@@ -25,6 +25,8 @@ const App: React.FC = () => {
     const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
     const [positions, setPositions] = useState<Position[]>([]);
     const [historicalPortfolioValue, setHistoricalPortfolioValue] = useState<HistoricalDataPoint[]>([]);
+    const [historicalDays, setHistoricalDays] = useState<number>(30);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(true);
     
     const [isLoading, setIsLoading] = useState(true);
     const [isMarketDataLoading, setIsMarketDataLoading] = useState(true);
@@ -152,16 +154,22 @@ const App: React.FC = () => {
         fetchMarketData();
     }, [activeTransactions]);
 
+    const handleTimeRangeChange = useCallback((days: number) => {
+        setHistoricalDays(days);
+    }, []);
+
     useEffect(() => {
         const calculateHistory = async () => {
+            setIsHistoryLoading(true);
             const posMap = calculatePositions(activeTransactions);
             const uniqueTickers = Object.keys(posMap).filter(ticker => posMap[ticker].shares > 0);
             if (uniqueTickers.length === 0) {
                 setHistoricalPortfolioValue([]);
+                setIsHistoryLoading(false);
                 return;
             }
 
-            const historyPromises = uniqueTickers.map(ticker => fetchHistoricalData(ticker, 30));
+            const historyPromises = uniqueTickers.map(ticker => fetchHistoricalData(ticker, historicalDays));
             const histories = await Promise.all(historyPromises);
 
             const portfolioHistory: { [date: string]: number } = {};
@@ -182,11 +190,12 @@ const App: React.FC = () => {
                 .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             
             setHistoricalPortfolioValue(sortedHistory);
+            setIsHistoryLoading(false);
         };
         if (!isMarketDataLoading) {
             calculateHistory();
         }
-    }, [activeTransactions, isMarketDataLoading]);
+    }, [activeTransactions, isMarketDataLoading, historicalDays]);
 
 
     const summaryData = useMemo(() => {
@@ -405,7 +414,12 @@ const App: React.FC = () => {
                        <div className="mt-8">
                             <h2 className="text-2xl font-bold text-white mb-4">Portfolio Analysis</h2>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                <PortfolioPerformanceChart key={activeAccount?.id} data={historicalPortfolioValue} />
+                                <PortfolioPerformanceChart 
+                                    key={activeAccount?.id} 
+                                    data={historicalPortfolioValue} 
+                                    onTimeRangeChange={handleTimeRangeChange} 
+                                    isLoading={isHistoryLoading} 
+                                />
                                 <PortfolioPieChart positions={positions} />
                             </div>
                         </div>
