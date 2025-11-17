@@ -37,7 +37,7 @@ export const Header: React.FC<HeaderProps> = ({ accounts, activeAccount, onSwitc
         <div className="flex items-center space-x-3">
           <ChartBarIcon className="h-8 w-8 text-green-accent" />
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
-            Stock Portfolio Tracker
+            US Stock Portfolio Tracker
           </h1>
         </div>
         
