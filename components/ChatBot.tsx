@@ -7,7 +7,6 @@ interface SummaryData {
     totalMarketValue: number;
     totalGainLoss: number;
     totalGainLossPercent: number;
-    // FIX: Added 'tradingCash' to match the type expected by getChatResponse.
     tradingCash: number;
 }
   
