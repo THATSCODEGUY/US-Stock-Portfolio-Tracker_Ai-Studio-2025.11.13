@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { type Transaction } from '../types';
 import { PencilIcon, TrashIcon, ArrowUpCircleIcon, ArrowDownCircleIcon, ArrowDownTrayIcon, ArrowUpTrayIcon } from './icons';
 
@@ -13,6 +13,23 @@ interface TransactionHistoryTableProps {
 
 export const TransactionHistoryTable: React.FC<TransactionHistoryTableProps> = ({ transactions, onEdit, onDelete, onImport, onExport, onExportAll }) => {
   const importInputRef = useRef<HTMLInputElement>(null);
+  const [isExportActiveOpen, setIsExportActiveOpen] = useState(false);
+  const [isExportAllOpen, setIsExportAllOpen] = useState(false);
+  const exportActiveRef = useRef<HTMLDivElement>(null);
+  const exportAllRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportActiveRef.current && !exportActiveRef.current.contains(event.target as Node)) {
+        setIsExportActiveOpen(false);
+      }
+      if (exportAllRef.current && !exportAllRef.current.contains(event.target as Node)) {
+        setIsExportAllOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleImportClick = () => {
     importInputRef.current?.click();
@@ -26,6 +43,16 @@ export const TransactionHistoryTable: React.FC<TransactionHistoryTableProps> = (
         importInputRef.current.value = '';
       }
     }
+  };
+
+  const handleExport = (format: 'json' | 'csv') => {
+    onExport(format);
+    setIsExportActiveOpen(false);
+  };
+  
+  const handleExportAll = (format: 'json' | 'csv') => {
+    onExportAll(format);
+    setIsExportAllOpen(false);
   };
   
   return (
@@ -41,38 +68,68 @@ export const TransactionHistoryTable: React.FC<TransactionHistoryTableProps> = (
              Import
            </button>
            <input type="file" ref={importInputRef} onChange={handleFileChange} accept=".json,.csv" className="hidden" />
-           
-           <div className="h-6 border-l border-gray-600 mx-2"></div>
 
-           <span className="text-sm text-gray-400">Export Active:</span>
-           <button 
-             onClick={() => onExport('json')} 
-             className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
-           >
-             JSON
-           </button>
-           <button 
-             onClick={() => onExport('csv')} 
-             className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
-           >
-             CSV
-           </button>
-
-           <div className="h-6 border-l border-gray-600 mx-2"></div>
-           
-           <span className="text-sm text-gray-400">Export All:</span>
-           <button 
-             onClick={() => onExportAll('json')} 
-             className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
-           >
-             JSON
-           </button>
-           <button 
-             onClick={() => onExportAll('csv')} 
-             className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
-           >
-             CSV
-           </button>
+            {/* Export Active Dropdown */}
+            <div className="relative" ref={exportActiveRef}>
+                <button
+                    onClick={() => setIsExportActiveOpen(prev => !prev)}
+                    className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
+                >
+                    <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+                    Export Active
+                </button>
+                {isExportActiveOpen && (
+                    <div className="absolute right-0 mt-2 w-28 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600">
+                        <div className="py-1">
+                            <a
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); handleExport('json'); }}
+                                className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
+                            >
+                                JSON
+                            </a>
+                            <a
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); handleExport('csv'); }}
+                                className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
+                            >
+                                CSV
+                            </a>
+                        </div>
+                    </div>
+                )}
+            </div>
+            
+            {/* Export All Dropdown */}
+            <div className="relative" ref={exportAllRef}>
+                <button
+                    onClick={() => setIsExportAllOpen(prev => !prev)}
+                    className="flex items-center justify-center py-2 px-3 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
+                >
+                    <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+                    Export All
+                </button>
+                {isExportAllOpen && (
+                    <div className="absolute right-0 mt-2 w-28 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600">
+                        <div className="py-1">
+                            <a
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); handleExportAll('json'); }}
+                                className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
+                            >
+                                JSON
+                            </a>
+                            <a
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); handleExportAll('csv'); }}
+                                className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
+                            >
+                                CSV
+                            </a>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
       </div>
       
